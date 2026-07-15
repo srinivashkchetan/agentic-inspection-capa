@@ -1,0 +1,30 @@
+[project]
+name = "capa-backend"
+version = "0.1.0"
+description = "AI-Assisted Corrective Action Planning (CAPA) — FastAPI backend"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "anthropic>=0.40",
+    "sqlalchemy>=2.0",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+# Embedded vector DB for RAG. The retriever falls back to the keyword seed
+# retriever if chromadb is absent (CAPA_RETRIEVER=auto).
+rag = ["chromadb>=0.5"]
+# Postgres driver (+ pgvector) for the production relational store.
+postgres = ["psycopg[binary]>=3.1", "pgvector>=0.3"]
+dev = ["pytest>=8.0", "httpx>=0.27", "ruff>=0.5"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
