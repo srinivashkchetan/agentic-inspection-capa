@@ -2,3 +2,27 @@
 Thumbs.db
 ~$*
 *.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets / env
+.env
+.env.local
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local databases
+*.sqlite
+*.db

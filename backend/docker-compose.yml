@@ -1,0 +1,28 @@
+# Local Postgres (with pgvector) for the CAPA relational store (PRD §5.2).
+# Bring up:  docker compose up -d
+# Then set in backend/.env:
+#   CAPA_DATABASE_URL=postgresql+psycopg://capa:capa@localhost:5432/capa
+# and seed:  python -m scripts.seed_db
+#
+# The pgvector image is used so the same instance can also host a pgvector-backed
+# RAG store if you choose Postgres over embedded Chroma later.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: capa
+      POSTGRES_PASSWORD: capa
+      POSTGRES_DB: capa
+    ports:
+      - "5432:5432"
+    volumes:
+      - capa_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U capa -d capa"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  capa_pgdata:

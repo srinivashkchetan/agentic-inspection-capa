@@ -67,6 +67,25 @@ The 9 sample FRI reports (Bureau Veritas, Walmart program; departments include F
 
 A structured, machine-readable version of these records (9 transcribed real reports + 25 synthetic) is maintained as `inspection_reports_all.json` and serves as seed/test data for retrieval and evals.
 
+### 5.2 Tech Stack
+
+The stack is chosen to honor the architecture's separation of duties (§5) and the "launch narrow, prove correctness" MVP principle (§9.1): embedded, zero-infra defaults for development, with clean seams so each component can be swapped for a managed/production service without touching the pipeline. The pipeline lives entirely behind a JSON API, so the frontend is a decoupled client and never talks to the model, RDBMS, or vector store directly.
+
+| Layer | Choice (MVP / dev) | Production swap | Rationale |
+| --- | --- | --- | --- |
+| **GenAI model** | Anthropic **Claude Opus 4.8** (`claude-opus-4-8`) via the official `anthropic` Python SDK, adaptive thinking | Model tiering (Phase 1): cheaper tier for routine defects, premium for severe/novel | Single capable tier for the MVP per §9.1; the SDK is the only sanctioned way to call Claude. Draft generation only — never the source of record. |
+| **Backend / API** | **Python 3.11+** + **FastAPI** (ASGI, `uvicorn`), **Pydantic v2** models | Same | Best ecosystem for RAG/OCR/embeddings/evals; typed request/response contracts; async I/O for parallel RDBMS + RAG retrieval. |
+| **Frontend** | **Next.js (App Router) + React + TypeScript**, decoupled SPA consuming the FastAPI JSON API | Same, hardened (auth, RBAC, polish) | HITL review console for quality engineers (gate #1 draft review/edit/approve, gate #2 evidence verification). Split now to avoid a later migration; frontend is API-only, so the backend is unchanged as the UI matures. |
+| **RDBMS (facts)** | **SQLite** via **SQLAlchemy** | **PostgreSQL** (managed) | System of record for exact facts (part/BOM, parsed FRI records, coded defects, AQL thresholds, lineage, historical CAPAs). SQLAlchemy keeps the swap to Postgres a config change. |
+| **RAG (knowledge)** | **Chroma** (embedded) + reranker seam | **pgvector** or managed (Pinecone/Weaviate) | Semantic retrieval over SOPs, standards, prior 8D/FMEA. Embedded for zero-infra dev; abstracted behind a retriever interface. |
+| **Embeddings** | Pluggable embedding-function interface (local default; provider optional) | Managed embedding endpoint | Kept behind an interface so the retrieval layer is provider-agnostic. |
+| **Ingestion / OCR** | Structured JSON seed loader; OCR adapter seam (e.g. a cloud Document AI or local OCR) behind a field-level confidence gate | Production OCR service | Real FRI reports are scanned PDFs; the parser is isolated behind a confidence gate so no low-confidence extraction reaches the RDBMS (§7.1). |
+| **Orchestration / guardrails** | In-process pipeline stages (ingest → classify → retrieve → assemble → generate → guardrails) with input/output guardrail hooks | Same, plus policy control surface (Phase 2) | Mirrors §5's context-engineering layer; keeps structured facts and retrieved knowledge in distinct channels. |
+| **Evaluation harness** | **pytest** for unit/contract tests; a dedicated `evals/` suite (ingestion, retrieval, faithfulness, acceptance) | CI-gated eval runs with drift alerting (Phase 1+) | §7.3 gates production readiness on correctness, not fluency. |
+| **Tooling** | `uv`/`pip` + `pyproject.toml` (backend), `npm` (frontend), `.env` for secrets, Docker-compose seam for local infra | CI/CD, container images | Reproducible dev setup; secrets never hardcoded (`ANTHROPIC_API_KEY` via env). |
+
+**Repository shape.** A two-app monorepo: `backend/` (FastAPI service — the source of truth) and `frontend/` (Next.js review console). The frontend consumes only the documented JSON API (`/reports`, `/capas`), so the two toolchains and deploys stay independent.
+
 ## 6. Requirements
 
 ### 6.1 Functional
